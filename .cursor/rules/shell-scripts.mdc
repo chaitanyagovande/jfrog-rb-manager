@@ -1,0 +1,84 @@
+---
+description: Shell script best practices — safety, validation, and portability
+globs: "**/*.sh"
+alwaysApply: false
+---
+
+# Shell Script Best Practices
+
+## Safety Header
+
+Always start with strict mode:
+
+```bash
+#!/bin/bash
+set -euo pipefail
+```
+
+- `set -e`: exit on any command failure
+- `set -u`: treat unset variables as errors
+- `set -o pipefail`: propagate pipe failures
+
+## Utility Functions
+
+Define reusable `log` and `die` helpers early:
+
+```bash
+log()  { printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"; }
+die()  { log "ERROR: $*" >&2; exit 1; }
+```
+
+## Input Validation
+
+- Validate all user-supplied inputs (CLI args, env vars) before use.
+- Use regex patterns with `[[ "$val" =~ $pattern ]]` for format checks.
+- Validate boolean env vars explicitly against `"true"` / `"false"`.
+- Never interpolate unsanitized input into queries, commands, or URLs.
+
+## printf Over echo
+
+Use `printf '%s\n' "$var"` instead of `echo "$var"` when piping data.
+`echo` interprets `-n`, `-e`, `-E` as flags — `printf` does not.
+
+## Quoting
+
+- Always double-quote variable expansions: `"$var"`, `"${array[@]}"`.
+- Use `"$@"` (not `$*`) to preserve argument boundaries.
+
+## Temp Files
+
+- Create with `mktemp` (never hardcoded paths).
+- Always register an EXIT trap to clean up:
+
+```bash
+TMPFILE=$(mktemp /tmp/prefix-XXXXXX)
+trap 'rm -f "$TMPFILE"' EXIT
+```
+
+## Command Existence Checks
+
+```bash
+command -v jq >/dev/null 2>&1 || die "jq is required but not installed."
+```
+
+## Avoid Useless Pipes
+
+```bash
+# Bad
+cat "$file" | jq .
+echo "$json" | jq .
+
+# Good
+jq . "$file"
+printf '%s' "$json" | jq .
+```
+
+## Error Handling
+
+- Check return codes of critical commands explicitly.
+- Provide actionable error messages that include the failing context.
+- Validate that parsed values (e.g. from jq) are non-empty and non-`null` before arithmetic or downstream use.
+
+## Shellcheck
+
+Run `shellcheck` on all scripts before committing. Suppress specific warnings only with inline directives and a justification comment.

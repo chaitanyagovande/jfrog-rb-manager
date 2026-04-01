@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Go build artifacts
+jf-cli-plugin/rb-manager
+
+# Go module cache (if vendored)
+jf-cli-plugin/vendor/
+
+# Temp files created by scripts
+/tmp/rb-spec-*.json

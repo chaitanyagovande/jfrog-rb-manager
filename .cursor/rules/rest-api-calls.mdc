@@ -1,0 +1,73 @@
+---
+description: Best practices for REST API calls in shell scripts (curl, jf rt curl, etc.)
+globs: "**/*.sh"
+alwaysApply: false
+---
+
+# REST API Call Best Practices (Shell)
+
+## Response Validation
+
+Always validate API responses before processing:
+
+1. **Check for valid JSON** before piping into `jq`:
+
+```bash
+if ! printf '%s' "$response" | jq empty 2>/dev/null; then
+    die "Response is not valid JSON: ${response:0:200}"
+fi
+```
+
+2. **Check for error payloads** (e.g. `.errors` array in JFrog APIs):
+
+```bash
+if printf '%s' "$response" | jq -e '.errors' >/dev/null 2>&1; then
+    printf '%s' "$response" | jq '.errors' >&2
+    exit 1
+fi
+```
+
+3. **Extract into a reusable function** (`validate_json_response`) to avoid duplicating checks.
+
+## Query Injection Prevention
+
+Never interpolate raw user input into AQL, SQL, GraphQL, or URL paths.
+
+- Validate inputs against an allowlist pattern before interpolation.
+- Reject characters that have syntactic meaning in the query language (`"`, `\`, `$`, `` ` ``, `'` for AQL).
+- Prefer parameterized APIs (e.g. jq `--arg` / `--argjson`) for JSON payload construction.
+
+## JSON Payload Construction
+
+Always use `jq` to build JSON payloads — never string concatenation:
+
+```bash
+# Bad — breaks on special characters in values
+PAYLOAD="{\"name\": \"${NAME}\"}"
+
+# Good — jq handles escaping
+PAYLOAD=$(jq -n --arg name "$NAME" '{ name: $name }')
+```
+
+Use `--arg` for strings and `--argjson` for booleans / numbers / objects.
+
+## Sensitive Data
+
+- Never hardcode tokens, passwords, or secrets in scripts.
+- Use CLI-managed auth (e.g. `jf config add`) or environment variables sourced from a secrets manager.
+- Be cautious about logging request/response bodies that may contain tokens.
+
+## Idempotency and Dry-Run
+
+- Support a `DRY_RUN` mode that prints the payload without sending it.
+- Log the full request context (method, URL, payload shape) to aid debugging.
+
+## Timeouts
+
+When using raw `curl`, set explicit timeouts:
+
+```bash
+curl --connect-timeout 10 --max-time 60 ...
+```
+
+JFrog CLI handles its own timeouts, but document any assumptions.
